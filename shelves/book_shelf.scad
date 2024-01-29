@@ -21,11 +21,11 @@ screw_head_depth = 3;
 // Spacing between book and outside of the shelf
 wall_thickness = 2; 
 // How thick should the shelf be? 
-shelf_thickness = 20;
+shelf_thickness = 15;
 // How wide should it be? 
 shelf_width = 150; 
-// How thick should the support be? 
-support_thickness = 6; // mm
+// Where sould support be Top or Bottom? 
+support_top = true;
 // nozzle width
 nozzle = 0.4;
 
@@ -35,22 +35,24 @@ $fn= $preview? 32:180;
 $fa=.1;
 version = "v1.0";
 size = str(book_depth," mm");
-
+use <MCAD/boxes.scad> 
+use <../libs/Round-Anything/polyround.scad>
 // The base is the size of the book + some wall thickness + the distance 
 // between the book and the wall when the book is tilted backwards
 
 // From back of the book to the wall is book_thickness * sin (book_angle)
-// shelf_width = num_books * (book_width + book_spacing) + wall_thickness*2; 
 wall_to_book = book_height * sin(slot_angle);
 shelf_depth = wall_to_book + book_depth + wall_thickness;  
 support_height = screw_head_dia * 2; // make it tall enough to support the screws.  
+support_thickness = wall_thickness+screw_head_depth; // mm
 
-module angle_cutter(right = true) {
-c = sqrt(pow(support_height,2) + pow(shelf_width/4, 2));
-theta = asin(support_height/c);
-translate(v = [right? shelf_width/2:-shelf_width/2, -shelf_depth/2,shelf_depth/2+support_height]) 
-rotate(a = [0, right? theta:-theta, 0]) 
-cube(size = [shelf_width/2, support_thickness*2, support_height*2], center = true);
+// TODO: add support location adjustment
+module angle_cutter(right = true, width = 100, height = 10, depth = 5, angle = 5) {
+    // calculate angle of 
+    c = sqrt(pow(height,2) + pow(width/4, 2));
+    theta = asin(height/c);
+    rotate(a = [0, right? theta:-theta, 0]) 
+    cube(size = [width/2, depth*2, height*2], center = true);
 }
 
 module counter_sunk_screw(sink_depth = 3, head_dia = 8, hole_dia = 5, l = 10) {
@@ -62,50 +64,90 @@ module chamfer(w = 1, l = 1) {
     linear_extrude(height = w, center = true)polygon(points = [[0,0], [0,l], [l,0]]); 
 }
 
+module support_panel(thickness = support_thickness, height = support_height, width=shelf_width) {
+    r = 25;
+    points = [[0,0,0], [width/2,0,0], [width/4, height,r], [-width/4, height, r], [-width/2, 0, 0]];
+    difference() {
+        //      ---|----
+        //     /   |    \
+        //     ----|-----
+        //        0,0
+        // TODO: Try PolyRound to give things a softer feel.  
+        rotate([90,0,0])linear_extrude(height = thickness, center = true)polygon(polyRound(radiipoints = points)); 
+        translate([0, thickness/2, height/2]) add_screw_holes();
+    }
+    translate([0,thickness/2,0])
+    difference() {
+        rotate([0,-90,0])chamfer(w = width, l = height/4);
+        translate([0,thickness,0])rotate([90,0,0])linear_extrude(height/3) shell2d(height/4 + 1)polygon(polyRound(radiipoints = points));
+    }
+}
 
-use <MCAD/boxes.scad> 
-// Adds some embossing for version and book gap (helpful if you have books with varying thickness)
-difference() {
-// combines the support to the shelf
-union() {
-// Create the shelf
-difference() {
-    // Main shelf
-    // cube([shelf_width, shelf_depth, shelf_thickness], center = true);
-    roundedCube([shelf_width, shelf_depth, shelf_thickness], r=2, sidesonly=true,center=true); // Adding a bit of clearance
+module add_screw_holes(dia = screw_diameter, head_dia = screw_head_dia, sink = screw_head_depth, width = shelf_width, l = support_thickness, sep = shelf_width/4) {
+    for (n = [-1:2:1]){
+        translate([n*sep,0, 0]) rotate([90,0,0]) 
+        counter_sunk_screw(sink_depth = sink, hole_dia = dia, head_dia = head_dia, l = l+1);
+    }
+}
 
-    // Slot for the book
-    rotate([-slot_angle, 0, 0])
-    translate([0, book_depth/2 - wall_thickness, -((book_depth/2*sin(slot_angle))+wall_thickness)])
-    // cube([(book_width + book_spacing), book_depth, (shelf_thickness-wall_thickness)], center=true); // Adding a bit of clearance
-    roundedCube([(book_width + book_spacing), book_depth, (shelf_thickness-wall_thickness)], r=2, sidesonly=false,center=true); // Adding a bit of clearance
+module shelf(t = shelf_thickness, d = shelf_depth, w = shelf_width, r = 2, angle = slot_angle, wall = wall_thickness, book_d = book_depth, book_w = book_width) {
+    book_distance = ((book_d/2*sin(angle))+wall);
+    union() {
+        // remove rounding on the back 
+        translate([w/2-r/2, d/2-r/2, 0])cube([r,r,t], center = true);
+        translate([-w/2+r/2, d/2-r/2, 0])cube([r,r,t], center = true); 
+        difference() {
+            // Main shelf
+            echo(book_distance);
+            echo(d);
+            roundedCube([w, d, t], r=2, sidesonly=true,center=true); // Adding a bit of clearance
+            // Slot for the book
+            // todo: check for min shelf size
+            rotate([angle, 0, 0])
+            translate([0, -(book_d/2 - wall), -book_distance])
+            roundedCube([book_w, book_d+2, (t)], r=2, sidesonly=false,center=true); // Adding a bit of clearance
+        };
+    }
+}
+module rib() {
+    translate(v = [0,-(shelf_depth/2-support_thickness),shelf_thickness/2]) 
+    rotate(a = [0,-90,0]) 
+    linear_extrude(height = support_thickness) 
+    polygon(points = [[0,0], [0, shelf_depth-support_thickness], [support_height, 0]], paths = [[0,1,2]]);
+}
+
+module assemble() {
+    // combines the support to the shelf
+    union() {
+        // Create the shelf
+        shelf();
+    rotate = support_top?180:0;
+    height = support_top?-shelf_thickness/2:shelf_thickness/2;
+        // Add support panel
+        translate([0,shelf_depth/2-support_thickness/2, (support_top?1:-1)*height]) 
+        rotate([0,rotate,180])
+        support_panel(thickness = support_thickness, height = support_height, width = shelf_width);
+        // Add support rib for bottom support, prob not necessary, but kinda cool
+        if (support_top == false) {
+            rib();
+        } 
+
+        }
+    }
+test = false;
+if (!test) {
+difference() {
+    assemble();
+    // Embossed version and cutout size. 
+    translate([shelf_width/3,(shelf_depth/2-nozzle_width),0]) 
+        rotate([-90,0,0])#linear_extrude(nozzle_width)text(text = version, size = 5);
 };
+}
 
-difference() {
-// Add support panel
-translate(v = [0,-shelf_depth/2+support_thickness/2, support_height/2]) 
-    cube([shelf_width, support_thickness, support_height+shelf_thickness], true);
-    // roundedCube([shelf_width, support_thickness, support_height], r=support_thickness/2, sidesonly=true, center=true);
-// Cut off the sides of the support
-// TODO: ensure these cuts don't cut into the shelf as values change
-angle_cutter(true);
-angle_cutter(false);
-// Add counter sunk holes
-for (n = [-1:2:1]){
-translate([n*shelf_width/4, -(shelf_depth/2-support_thickness-0.1), shelf_thickness/2+support_height/2]) rotate([90,0,0]) 
-counter_sunk_screw(sink_depth = screw_head_depth, hole_dia = screw_diameter, head_dia = screw_head_dia, l = support_thickness*2);
-}
-}
-// Add support rib
-translate(v = [0,-(shelf_depth/2-support_thickness),shelf_thickness/2]) 
-rotate(a = [0,-90,0]) 
-linear_extrude(height = support_thickness) 
-polygon(points = [[0,0], [0, shelf_depth-support_thickness], [support_height, 0]], paths = [[0,1,2]]);
-
-// Chamfer support to shelf
-translate([0,-shelf_depth/2+support_thickness,shelf_thickness/2])rotate([90,0,0])rotate([0,90,0])chamfer(shelf_width, screw_head_dia/3);
-}
-// Embossed version and cutout size. 
-translate([shelf_width/2-wall_thickness,-(shelf_depth/2-nozzle_width),0]) rotate([90,180,0])linear_extrude(nozzle_width)text(text = version, size = 5);
-translate([0,-(shelf_depth/2-nozzle_width),0]) rotate([90,180,0])linear_extrude(nozzle_width)text(text = size, size = 5);
-}
+////////////////// Tests /////////////////////
+// shelf();
+// support_panel();
+// add_screw_holes();
+// angle_cutter();
+// counter_sunk_screw();
+// chamfer();
