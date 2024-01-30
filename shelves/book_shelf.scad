@@ -20,6 +20,8 @@ screw_head_dia = 8.5;
 screw_head_depth = 3;
 // Spacing between book and outside of the shelf
 wall_thickness = 2; 
+// how much extra in front of the book?
+shelf_extra = 3;
 // How thick should the shelf be? 
 shelf_thickness = 15;
 // How wide should it be? 
@@ -35,6 +37,7 @@ $fn= $preview? 32:180;
 $fa=.1;
 version = "v1.0";
 size = str(book_depth," mm");
+// TODO: remove boxes and redo with polyround
 use <MCAD/boxes.scad> 
 use <../libs/Round-Anything/polyround.scad>
 // The base is the size of the book + some wall thickness + the distance 
@@ -42,9 +45,11 @@ use <../libs/Round-Anything/polyround.scad>
 
 // From back of the book to the wall is book_thickness * sin (book_angle)
 wall_to_book = book_height * sin(slot_angle);
-shelf_depth = wall_to_book + book_depth + wall_thickness;  
+shelf_depth = wall_to_book + book_depth + shelf_extra;  
+echo("Shelf Depth", shelf_depth);
 support_height = screw_head_dia * 2; // make it tall enough to support the screws.  
-support_thickness = wall_thickness+screw_head_depth; // mm
+support_depth = wall_thickness+screw_head_depth; // mm
+echo("Support Depth", support_depth);
 
 // TODO: add support location adjustment
 module angle_cutter(right = true, width = 100, height = 10, depth = 5, angle = 5) {
@@ -64,7 +69,7 @@ module chamfer(w = 1, l = 1) {
     linear_extrude(height = w, center = true)polygon(points = [[0,0], [0,l], [l,0]]); 
 }
 
-module support_panel(thickness = support_thickness, height = support_height, width=shelf_width) {
+module support_panel(thickness = support_depth, height = support_height, width=shelf_width) {
     r = 25;
     points = [[0,0,0], [width/2,0,0], [width/4, height,r], [-width/4, height, r], [-width/2, 0, 0]];
     difference() {
@@ -72,7 +77,6 @@ module support_panel(thickness = support_thickness, height = support_height, wid
         //     /   |    \
         //     ----|-----
         //        0,0
-        // TODO: Try PolyRound to give things a softer feel.  
         rotate([90,0,0])linear_extrude(height = thickness, center = true)polygon(polyRound(radiipoints = points)); 
         translate([0, thickness/2, height/2]) add_screw_holes();
     }
@@ -83,37 +87,34 @@ module support_panel(thickness = support_thickness, height = support_height, wid
     }
 }
 
-module add_screw_holes(dia = screw_diameter, head_dia = screw_head_dia, sink = screw_head_depth, width = shelf_width, l = support_thickness, sep = shelf_width/4) {
+module add_screw_holes(dia = screw_diameter, head_dia = screw_head_dia, sink = screw_head_depth, width = shelf_width, l = support_depth, sep = shelf_width/4) {
     for (n = [-1:2:1]){
         translate([n*sep,0, 0]) rotate([90,0,0]) 
         counter_sunk_screw(sink_depth = sink, hole_dia = dia, head_dia = head_dia, l = l+1);
     }
 }
 
-module shelf(t = shelf_thickness, d = shelf_depth, w = shelf_width, r = 2, angle = slot_angle, wall = wall_thickness, book_d = book_depth, book_w = book_width) {
+module shelf(t = shelf_thickness, d = shelf_depth, w = shelf_width, r = 2, angle = slot_angle, wall = wall_thickness, book_d = book_depth, book_w = book_width, book_p = wall_to_book) {
     book_distance = ((book_d/2*sin(angle))+wall);
     union() {
         // remove rounding on the back 
+        // TODO: use polyRound for this
         translate([w/2-r/2, d/2-r/2, 0])cube([r,r,t], center = true);
         translate([-w/2+r/2, d/2-r/2, 0])cube([r,r,t], center = true); 
         difference() {
             // Main shelf
-            echo(book_distance);
-            echo(d);
             roundedCube([w, d, t], r=2, sidesonly=true,center=true); // Adding a bit of clearance
             // Slot for the book
-            // todo: check for min shelf size
+            cutout_y_pos = book_p-book_d;
             rotate([angle, 0, 0])
-            translate([0, -(book_d/2 - wall), -book_distance])
-            roundedCube([book_w, book_d+2, (t)], r=2, sidesonly=false,center=true); // Adding a bit of clearance
+            translate([0, -(cutout_y_pos), -book_distance])
+            #roundedCube([book_w, book_d+2, (t)], r=2, sidesonly=false,center=true); // Adding a bit of clearance
         };
     }
 }
 module rib() {
-    translate(v = [0,-(shelf_depth/2-support_thickness),shelf_thickness/2]) 
-    rotate(a = [0,-90,0]) 
-    linear_extrude(height = support_thickness) 
-    polygon(points = [[0,0], [0, shelf_depth-support_thickness], [support_height, 0]], paths = [[0,1,2]]);
+    linear_extrude(height = support_depth) 
+    polygon(points = [[0,0], [0, shelf_depth-support_depth], [support_height, 0]], paths = [[0,1,2]]);
 }
 
 module assemble() {
@@ -122,14 +123,15 @@ module assemble() {
         // Create the shelf
         shelf();
     rotate = support_top?180:0;
-    height = support_top?-shelf_thickness/2:shelf_thickness/2;
         // Add support panel
-        translate([0,shelf_depth/2-support_thickness/2, (support_top?1:-1)*height]) 
+        translate([0,shelf_depth/2-support_depth/2, (support_top?1:-1)*-shelf_thickness/2]) 
         rotate([0,rotate,180])
-        support_panel(thickness = support_thickness, height = support_height, width = shelf_width);
+        support_panel(thickness = support_depth, height = support_height, width = shelf_width);
         // Add support rib for bottom support, prob not necessary, but kinda cool
         if (support_top == false) {
-            rib();
+            translate(v = [0,(shelf_depth/2-support_depth),shelf_thickness/2]) 
+            rotate(a = [0,-90,180]) 
+            #rib();
         } 
 
         }
