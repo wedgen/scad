@@ -1,0 +1,43 @@
+{
+    "fileFormatVersion": "1",
+    "parameterSets": {
+        "20mm #6": {
+            "$fa": "0.10000000000000001",
+            "book_depth": "20",
+            "book_height": "205",
+            "book_spacing": "5",
+            "book_width": "205",
+            "nozzle": "0.40000000000000002",
+            "nozzle_width": "0.40000000000000002",
+            "screw_diameter": "4",
+            "screw_head_depth": "2.5",
+            "screw_head_dia": "7",
+            "shelf_extra": "4",
+            "shelf_thickness": "15",
+            "shelf_width": "125",
+            "slot_angle": "5",
+            "support_top": "true",
+            "version": "v1.1",
+            "wall_thickness": "2"
+        },
+        "11.5 mm #6": {
+            "$fa": "0.1",
+            "book_depth": "11.5",
+            "book_height": "205",
+            "book_spacing": "5",
+            "book_width": "205",
+            "nozzle": "0.4",
+            "nozzle_width": "0.4",
+            "screw_diameter": "4",
+            "screw_head_depth": "2.5",
+            "screw_head_dia": "7",
+            "shelf_extra": "3",
+            "shelf_thickness": "15",
+            "shelf_width": "125",
+            "slot_angle": "5",
+            "support_top": "true",
+            "version": "v1.1",
+            "wall_thickness": "2"
+        }
+    }
+}

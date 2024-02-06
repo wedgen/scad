@@ -7,18 +7,18 @@ book_width = 205;
 // How tall is your book
 book_height = 205;
 // Angle the book sits at in deg
-slot_angle = 5;
+slot_angle = 5.0;
 // of the printer
 nozzle_width = 0.4;
 // how far apart do you want the books in mm
 book_spacing = 5; // mm
 // Screw dimensions
-screw_diameter = 5; // Assuming #8 screws
+screw_diameter = 5.0; // Assuming #8 screws
 // Screw Head Diameter
-screw_head_dia = 8.5;
+screw_head_dia = 7.0;
 // screw head depth
-screw_head_depth = 3;
-// Spacing between book and outside of the shelf
+screw_head_depth = 2.5;
+// Spacing between book and outside of the shelf in mm
 wall_thickness = 2; 
 // how much extra in front of the book?
 shelf_extra = 3;
@@ -35,7 +35,7 @@ nozzle = 0.4;
 
 $fn= $preview? 32:180;
 $fa=.1;
-version = "v1.0";
+version = "v1.1";
 size = str(book_depth," mm");
 // TODO: remove boxes and redo with polyround
 use <MCAD/boxes.scad> 
@@ -45,6 +45,7 @@ use <../libs/Round-Anything/polyround.scad>
 
 // From back of the book to the wall is book_thickness * sin (book_angle)
 wall_to_book = book_height * sin(slot_angle);
+echo("Wall to Book", wall_to_book);
 shelf_depth = wall_to_book + book_depth + shelf_extra;  
 echo("Shelf Depth", shelf_depth);
 support_height = screw_head_dia * 2; // make it tall enough to support the screws.  
@@ -93,8 +94,8 @@ module add_screw_holes(dia = screw_diameter, head_dia = screw_head_dia, sink = s
         counter_sunk_screw(sink_depth = sink, hole_dia = dia, head_dia = head_dia, l = l+1);
     }
 }
-
-module shelf(t = shelf_thickness, d = shelf_depth, w = shelf_width, r = 2, angle = slot_angle, wall = wall_thickness, book_d = book_depth, book_w = book_width, book_p = wall_to_book) {
+// Shelf the book sits in, includes a cutout at a desired angle for book. 
+module shelf(t = shelf_thickness, d = shelf_depth, w = shelf_width, r = 2, angle = slot_angle, wall = wall_thickness, book_d = book_depth, book_w = book_width, book_p = wall_to_book, extra = shelf_extra) {
     book_distance = ((book_d/2*sin(angle))+wall);
     union() {
         // remove rounding on the back 
@@ -105,13 +106,16 @@ module shelf(t = shelf_thickness, d = shelf_depth, w = shelf_width, r = 2, angle
             // Main shelf
             roundedCube([w, d, t], r=2, sidesonly=true,center=true); // Adding a bit of clearance
             // Slot for the book
-            cutout_y_pos = book_p-book_d;
+            cutout_y_pos = (book_p + book_d/2)-d/2;
+            echo("cutout y pos", cutout_y_pos);
             rotate([angle, 0, 0])
             translate([0, -(cutout_y_pos), -book_distance])
             #roundedCube([book_w, book_d+2, (t)], r=2, sidesonly=false,center=true); // Adding a bit of clearance
         };
     }
 }
+
+// Rib used when the support panel is set to bottom
 module rib() {
     linear_extrude(height = support_depth) 
     polygon(points = [[0,0], [0, shelf_depth-support_depth], [support_height, 0]], paths = [[0,1,2]]);
