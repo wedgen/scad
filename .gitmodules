@@ -3,4 +3,4 @@
 	url = git@github.com:Irev-Dev/Round-Anything.git
 [submodule "libs/BOSL2"]
 	path = libs/BOSL2
-	url = git@https://github.com/BelfrySCAD/BOSL2
+	url = https://github.com/BelfrySCAD/BOSL2
